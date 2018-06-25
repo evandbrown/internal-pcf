@@ -1,0 +1,3 @@
+[submodule "pcf-pipelines"]
+	path = pcf-pipelines
+	url = git@github.com:evandbrown/pcf-pipelines.git

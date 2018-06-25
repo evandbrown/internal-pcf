@@ -1,0 +1,11 @@
+- type: replace
+  path: /compilation/vm_type
+  value: n1-highcpu-2
+
+- type: replace
+  path: /vm_extensions/-
+  value:
+    cloud_properties:
+      backend_service: {name: "((ilb_backend_service))", scheme: "INTERNAL"}
+    name: ilb
+

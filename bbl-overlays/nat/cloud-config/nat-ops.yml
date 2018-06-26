@@ -1,0 +1,8 @@
+- type: replace
+  path: /vm_extensions/-
+  value:
+    cloud_properties:
+      tags:
+      - ((nat_routing_tag))
+      ephemeral_external_ip: false
+    name: nat

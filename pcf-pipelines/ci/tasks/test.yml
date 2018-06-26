@@ -1,0 +1,30 @@
+---
+platform: linux
+
+image_resource:
+  type: docker-image
+  source:
+    repository: golang
+
+inputs:
+- name: pcf-pipelines
+
+run:
+  path: bash
+  args:
+  - -ce
+  - |
+    mkdir -p $GOPATH/src/github.com/pivotal-cf
+
+    cp -R pcf-pipelines $GOPATH/src/github.com/pivotal-cf
+
+    # install glide for dependency management
+    curl -k https://glide.sh/get | sh
+
+    # install ginkgo
+    go get github.com/onsi/ginkgo/ginkgo
+
+    pushd $GOPATH/src/github.com/pivotal-cf/pcf-pipelines
+      glide install
+      ginkgo -p -r -randomizeAllSpecs
+    popd

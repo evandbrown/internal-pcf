@@ -1,0 +1,279 @@
+resource_types:
+- name: curl
+  type: docker-image
+  source:
+    repository: pivotalservices/concourse-curl-resource
+    tag: latest
+
+resources:
+- name: version
+  type: semver
+  source:
+    driver: s3
+    initial_version: 1.0.6
+    bucket: {{version_bucket_name}}
+    key: docker-version
+    region_name: {{version_bucket_region}}
+    access_key_id: {{aws_access_key_id}}
+    secret_access_key: {{aws_secret_access_key}}
+
+- name: pcf-pipelines
+  type: git
+  source:
+    uri: git@github.com:pivotal-cf/pcf-pipelines.git
+    branch: master
+    private_key: {{git_private_key}}
+    paths: [ci/Dockerfile]
+
+- name: pcf-pipelines-image
+  type: docker-image
+  source:
+    repository: pcfnorm/rootfs
+    tag: latest
+    username: {{dockerhub_username}}
+    password: {{dockerhub_password}}
+
+- name: pcf-pipelines-image-rc
+  type: docker-image
+  source:
+    repository: pcfnorm/rootfs
+    tag: release-candidate
+    username: {{dockerhub_username}}
+    password: {{dockerhub_password}}
+
+- name: cflinuxfs2
+  type: docker-image
+  source:
+    repository: cloudfoundry/cflinuxfs2
+    tag: latest
+
+- name: om
+  type: github-release
+  source:
+    user: pivotal-cf
+    repository: om
+    access_token: {{github_token}}
+
+- name: semver-cli
+  type: github-release
+  source:
+    user: christianang
+    repository: semver-cli
+    access_token: {{github_token}}
+
+- name: yaml-patch
+  type: github-release
+  source:
+    user: pivotal-cf
+    repository: yaml-patch
+    access_token: {{github_token}}
+
+- name: cliaas
+  type: github-release
+  source:
+    user: pivotal-cf
+    repository: cliaas
+    access_token: {{github_token}}
+
+- name: pivnet-cli
+  type: github-release
+  source:
+    user: pivotal-cf
+    repository: pivnet-cli
+    access_token: {{github_token}}
+
+- name: govc
+  type: github-release
+  source:
+    user: vmware
+    repository: govmomi
+    access_token: {{github_token}}
+
+- name: stemcell-downloader
+  type: github-release
+  source:
+    user: pivotal-cf
+    repository: pcf-product-stemcell-downloader
+    access_token: {{github_token}}
+
+- name: steamroll
+  type: github-release
+  source:
+    user: pivotal-cf
+    repository: concourse-pipeline-steamroller
+    access_token: {{github_token}}
+
+- name: terraform
+  type: github-release
+  source:
+    user: hashicorp
+    repository: terraform
+    access_token: {{github_token}}
+
+- name: terraforming-azure
+  type: git
+  source:
+     uri: https://github.com/dtimm/terraforming-azure.git
+     branch: improve-configurability
+
+- name: jq
+  type: curl
+  source:
+    url: https://github.com/stedolan/jq/releases/download/jq-1.5/jq-linux64
+    filename: jq
+
+jobs:
+- name: build-pcf-pipelines-image
+  serial_groups: [pcf-pipelines-image]
+  plan:
+  - aggregate:
+    - get: pcf-pipelines
+      trigger: true
+    - get: cflinuxfs2
+      trigger: true
+      params: {save: true}
+    - get: yaml-patch
+      params: {globs: ["*linux*"]}
+    - get: semver-cli
+      params: {globs: ["*linux*"]}
+    - get: om
+      params: {globs: ["*linux*"]}
+    - get: cliaas
+      params: {globs: ["*linux*"]}
+    - get: pivnet-cli
+      params: {globs: ["*linux*"]}
+    - get: govc
+      params: {globs: ["*linux_amd64*"]}
+    - get: stemcell-downloader
+      params: {globs: ["*linux*"]}
+    - get: steamroll
+      params: {globs: ["*linux*"]}
+    - get: terraform
+    - get: terraforming-azure
+    - get: jq
+
+  - task: prepare-workspace
+    config:
+      platform: linux
+      image_resource:
+        type: docker-image
+        source:
+          repository: pcfnorm/rootfs
+
+      inputs:
+      - name: pcf-pipelines
+      - name: om
+      - name: yaml-patch
+      - name: semver-cli
+      - name: cliaas
+      - name: pivnet-cli
+      - name: govc
+      - name: stemcell-downloader
+      - name: steamroll
+      - name: terraform
+      - name: terraforming-azure
+      - name: jq
+      outputs:
+      - name: workspace
+      run:
+        path: bash
+        args:
+        - -c
+        - |
+          cp \
+            semver-cli/semver-linux \
+            om/om-linux \
+            yaml-patch/yaml_patch_linux \
+            cliaas/cliaas-linux \
+            jq/jq \
+            workspace
+
+          cp pivnet-cli/pivnet-linux-* workspace/pivnet-cli
+          cp stemcell-downloader/stemcell-downloader-linux workspace/stemcell-downloader
+          cp steamroll/steamroll_linux workspace/steamroll
+
+          terraform_version=$(cat terraform/tag | awk '{print substr($1,2);}')
+          wget -O /tmp/tf.zip "https://releases.hashicorp.com/terraform/${terraform_version}/terraform_${terraform_version}_linux_amd64.zip"
+          unzip -d workspace /tmp/tf.zip
+
+          wget -O /tmp/cf.tgz 'https://packages.cloudfoundry.org/stable?release=linux64-binary&source=github-rel'
+          tar xzf /tmp/cf.tgz -C /tmp
+          cp /tmp/cf workspace/cf
+
+          gunzip govc/govc_linux_amd64.gz
+          cp govc/govc_linux_amd64 workspace/govc
+
+          chmod +x workspace/*
+
+          mv terraforming-azure workspace/terraforming-azure
+
+          cp pcf-pipelines/ci/Dockerfile workspace
+
+  - put: pcf-pipelines-image-rc
+    params:
+      load_base: cflinuxfs2
+      build: workspace
+
+- name: test-pcf-pipelines-image
+  serial_groups: [pcf-pipelines-image]
+  plan:
+  - get: cliaas
+    passed: [build-pcf-pipelines-image]
+  - get: pcf-pipelines-image-rc
+    trigger: true
+    passed: [build-pcf-pipelines-image]
+    params:
+      skip_download: true
+  - task: test-for-required-binaries
+    config:
+      platform: linux
+      image_resource:
+        type: docker-image
+        source:
+          repository: pcfnorm/rootfs
+          tag: release-candidate
+      run:
+        path: sh
+        args:
+        - -c
+        - |
+          set -xe
+          which om-linux
+          which yaml_patch_linux
+          which semver-linux
+          which cf
+          which cliaas-linux
+          which pivnet-cli
+          which govc
+          which stemcell-downloader
+          which jq
+          which terraform
+          which gcloud
+          which gem
+          which pip
+          which uaac
+          which aws
+          which openstack
+          which neutron
+          which steamroll
+
+- name: promote-image
+  serial_groups: [pcf-pipelines-image]
+  plan:
+  - get: cliaas
+    passed: [test-pcf-pipelines-image]
+  - get: pcf-pipelines-image-rc
+    passed: [test-pcf-pipelines-image]
+    trigger: true
+    params:
+      save: true
+  - get: version
+    params:
+      bump: patch
+  - put: pcf-pipelines-image
+    params:
+      load: pcf-pipelines-image-rc
+      tag: version/version
+  - put: version
+    params:
+      file: version/version

@@ -1,0 +1,1546 @@
+groups:
+- name: all
+  jobs:
+  - bump-patch
+  - bump-minor
+  - test
+  - publish-rc
+  - test-rc
+  - lock-vsphere
+  - destroy-rc-vsphere-install
+  - set-rc-vsphere-install
+  - wipe-vsphere
+  - trigger-install-pcf-vsphere
+  - lock-vsphere-offline
+  - destroy-rc-vsphere-offline-install
+  - set-offline-pipelines
+  - trigger-create-offline-pinned-pipelines
+  - trigger-unpack-pipelines-combined
+  - wipe-vsphere-offline
+  - trigger-install-pcf-vsphere-offline
+  - lock-gcp
+  - destroy-rc-gcp-install
+  - set-rc-gcp-install
+  - wipe-gcp
+  - trigger-install-pcf-gcp
+  - lock-azure
+  - destroy-rc-azure-install
+  - set-rc-azure-install
+  - wipe-azure
+  - trigger-install-pcf-azure
+  - lock-aws
+  - destroy-rc-aws-install
+  - set-rc-aws-install
+  - wipe-aws
+  - trigger-install-pcf-aws
+  - check-environments-complete
+  - publish-release
+  - destroy-lre-gcp-upgrade-ops-manager
+  - set-lre-gcp-upgrade-ops-manager
+  - trigger-lre-gcp-upgrade-ops-manager
+  - destroy-rc-gcp-upgrade-pas-tile
+  - set-rc-gcp-upgrade-pas-tile
+  - trigger-rc-gcp-upgrade-pas-tile
+  - lock-gcp-lre
+  - cleanup-gcp-lre
+  - force-unlock-vsphere-install-pcf
+  - force-unlock-gcp-install-pcf
+  - force-unlock-gcp-install-pcf
+  - force-unlock-azure-install-pcf
+  - force-unlock-aws-install-pcf
+  - force-unlock-lre-gcp-upgrade-opsman
+  - force-unlock-vsphere-offline-install-pcf
+  - final-wipe-vsphere
+  - final-wipe-aws
+  - final-wipe-azure
+  - final-wipe-gcp
+- name: unlocks
+  jobs:
+  - force-unlock-vsphere-install-pcf
+  - force-unlock-vsphere-offline-install-pcf
+  - force-unlock-gcp-install-pcf
+  - force-unlock-gcp-install-pcf
+  - force-unlock-azure-install-pcf
+  - force-unlock-aws-install-pcf
+  - force-unlock-lre-gcp-upgrade-opsman
+- name: vsphere
+  jobs:
+  - force-unlock-vsphere-install-pcf
+  - lock-vsphere
+  - destroy-rc-vsphere-install
+  - set-rc-vsphere-install
+  - wipe-vsphere
+  - trigger-install-pcf-vsphere
+  - final-wipe-vsphere
+  - check-environments-complete
+- name: offline
+  jobs:
+  - force-unlock-vsphere-offline-install-pcf
+  - lock-vsphere-offline
+  - destroy-rc-vsphere-offline-install
+  - set-offline-pipelines
+  - trigger-create-offline-pinned-pipelines
+  - trigger-unpack-pipelines-combined
+  - wipe-vsphere-offline
+  - trigger-install-pcf-vsphere-offline
+- name: gcp
+  jobs:
+  - force-unlock-gcp-install-pcf
+  - lock-gcp
+  - destroy-rc-gcp-install
+  - set-rc-gcp-install
+  - wipe-gcp
+  - trigger-install-pcf-gcp
+  - destroy-rc-gcp-upgrade-pas-tile
+  - set-rc-gcp-upgrade-pas-tile
+  - trigger-rc-gcp-upgrade-pas-tile
+  - final-wipe-gcp
+  - check-environments-complete
+- name: azure
+  jobs:
+  - force-unlock-azure-install-pcf
+  - lock-azure
+  - destroy-rc-azure-install
+  - set-rc-azure-install
+  - wipe-azure
+  - trigger-install-pcf-azure
+  - final-wipe-azure
+  - check-environments-complete
+- name: aws
+  jobs:
+  - force-unlock-aws-install-pcf
+  - lock-aws
+  - destroy-rc-aws-install
+  - set-rc-aws-install
+  - wipe-aws
+  - trigger-install-pcf-aws
+  - final-wipe-aws
+  - check-environments-complete
+- name: upgrade-lre-gcp
+  jobs:
+  - set-lre-gcp-upgrade-ops-manager
+  - destroy-lre-gcp-upgrade-ops-manager
+  - trigger-lre-gcp-upgrade-ops-manager
+  - lock-gcp-lre
+  - check-environments-complete
+  - force-unlock-lre-gcp-upgrade-opsman
+  - cleanup-gcp-lre
+
+resource_types:
+- name: smuggler
+  type: docker-image
+  source:
+    repository: redfactorlabs/concourse-smuggler-resource
+    tag: ubuntu
+
+- name: pivnet
+  type: docker-image
+  source:
+    repository: pivotalcf/pivnet-resource
+    tag: latest-final
+
+- name: slack-notification
+  type: docker-image
+  source:
+    repository: cfcommunity/slack-notification-resource
+    tag: latest
+
+- name: curl
+  type: docker-image
+  source:
+    repository: pivotalservices/concourse-curl-resource
+    tag: latest
+
+resources:
+- name: daily
+  type: time
+  source:
+    interval: 23h
+    start: "12:00 AM"
+    stop: "11:59 PM"
+    location: America/Los_Angeles
+    days: [Monday, Tuesday, Wednesday, Thursday, Friday]
+
+- name: rootfs-tag
+  type: smuggler
+  source:
+    commands:
+      check: |
+        curl https://registry.hub.docker.com/v1/repositories/pcfnorm/rootfs/tags | jq -r .[].name | grep "^v" | sort -V > ${SMUGGLER_OUTPUT_DIR}/versions
+      in: |
+        echo "${SMUGGLER_VERSION_ID}" > ${SMUGGLER_DESTINATION_DIR}/${SMUGGLER_target_file}
+    target_file: tag
+
+- name: pcf-pipelines
+  type: git
+  source:
+    uri: git@github.com:pivotal-cf/pcf-pipelines.git
+    branch: master
+    private_key: {{git_private_key}}
+
+- name: pivnet-rc
+  type: pivnet
+  source:
+    api_token: {{pivnet_token}}
+    product_slug: pcf-automation
+    access_key_id: {{pivnet_aws_access_key}}
+    secret_access_key: {{pivnet_aws_secret_key}}
+    product_version: .*-rc\.\d+
+
+- name: pivnet-release
+  type: pivnet
+  source:
+    api_token: {{pivnet_token}}
+    product_slug: pcf-automation
+    access_key_id: {{pivnet_aws_access_key}}
+    secret_access_key: {{pivnet_aws_secret_key}}
+
+- name: vsphere-lock
+  type: pool
+  source:
+    pool: vsphere
+    <<: *norm-ci-locks-params
+
+- name: vsphere-offline-lock
+  type: pool
+  source:
+    pool: vsphere-offline
+    <<: *norm-ci-locks-params
+
+- name: gcp-lock
+  type: pool
+  source:
+    pool: gcp
+    <<: *norm-ci-locks-params
+
+- name: azure-lock
+  type: pool
+  source:
+    pool: azure
+    <<: *norm-ci-locks-params
+
+- name: aws-lock
+  type: pool
+  source:
+    pool: aws
+    <<: *norm-ci-locks-params
+
+- name: version
+  type: semver
+  source:
+    driver: s3
+    initial_version: 0.23.2-rc.50
+    bucket: {{version_bucket_name}}
+    key: version
+    region_name: {{version_bucket_region}}
+    access_key_id: {{aws_access_key_id}}
+    secret_access_key: {{aws_secret_access_key}}
+
+- name: slack
+  type: slack-notification
+  source:
+    url: {{slack_webhook_url}}
+
+- name: fly
+  type: curl
+  source:
+    url: "((atc_external_url))/api/v1/cli?arch=amd64&platform=linux"
+    filename: fly
+    skip_ssl_verification: true
+
+jobs:
+- name: force-unlock-vsphere-offline-install-pcf
+  serial: true
+  plan:
+  - get: vsphere-offline-lock
+    passed: [ lock-vsphere-offline ]
+  - try:
+      put: vsphere-offline-lock
+      params: {release: vsphere-offline-lock}
+
+- name: force-unlock-vsphere-install-pcf
+  serial: true
+  plan:
+  - get: vsphere-lock
+    passed: [ lock-vsphere ]
+  - try:
+      put: vsphere-lock
+      params: {release: vsphere-lock}
+
+- name: force-unlock-gcp-install-pcf
+  serial: true
+  plan:
+  - get: gcp-lock
+    passed: [ lock-gcp ]
+  - try:
+      put: gcp-lock
+      params: {release: gcp-lock}
+
+- name: force-unlock-azure-install-pcf
+  serial: true
+  plan:
+  - get: azure-lock
+    passed: [ lock-azure ]
+  - try:
+      put: azure-lock
+      params: {release: azure-lock}
+
+- name: force-unlock-aws-install-pcf
+  serial: true
+  plan:
+  - get: aws-lock
+    passed: [ lock-aws ]
+  - try:
+      put: aws-lock
+      params: {release: aws-lock}
+
+- name: force-unlock-lre-gcp-upgrade-opsman
+  serial: true
+  plan:
+  - get: gcp-lock
+    passed: [ lock-gcp-lre ]
+  - try:
+      put: gcp-lock
+      params: {release: gcp-lock}
+
+
+- name: bump-patch
+  serial_groups: [version]
+  plan:
+  - put: version
+    params: {bump: patch}
+
+- name: bump-minor
+  serial_groups: [version]
+  plan:
+  - put: version
+    params: {bump: minor}
+
+- name: test
+  on_failure:
+    <<: *notify_slack
+  plan:
+  - get: pcf-pipelines
+    trigger: true
+  - task: test
+    attempts: 3
+    file: pcf-pipelines/ci/tasks/test.yml
+
+- name: publish-rc
+  serial_groups: [version]
+  on_failure:
+    <<: *notify_slack
+  plan:
+  - aggregate:
+    - get: pcf-pipelines
+      passed: [test]
+    - get: fly
+    - get: rootfs-tag
+
+  - put: version
+    params: {pre: rc}
+
+  - task: create-release
+    file: pcf-pipelines/ci/tasks/create-release/task.yml
+    params:
+      AVAILABILITY: Admins Only
+
+  - put: pivnet-rc
+    params:
+      metadata_file: pivnet-metadata/metadata.yml
+      file_glob: pcf-pipelines-release-tarball/*.tgz
+      s3_filepath_prefix: {{pivnet_s3_filepath_prefix}}
+
+  - put: pcf-pipelines
+    params:
+      repository: pcf-pipelines
+      tag: version/version
+      tag_prefix: v
+      only_tag: true
+
+- name: test-rc
+  on_failure:
+    <<: *notify_slack
+  plan:
+  - aggregate:
+    - get: version
+    - get: src
+      resource: pcf-pipelines
+      passed: [publish-rc]
+    - get: rootfs-tag
+      passed: [publish-rc]
+  - do:
+    - get: pivnet-rc
+      trigger: true
+      passed: [publish-rc]
+    - task: unpack-rc
+      file: src/ci/tasks/unpack_tarball.yml
+      input_mapping: { tarball: pivnet-rc }
+      output_mapping: { unpacked_tarball: pcf-pipelines-release }
+
+  - task: prepare-workspace
+    config:
+      platform: linux
+      image_resource:
+        type: docker-image
+        source:
+          repository: pcfnorm/rootfs
+      inputs:
+      - name: src
+      - name: pcf-pipelines-release
+      outputs:
+      - name: pcf-pipelines
+      run:
+        path: bash
+        args:
+        - -c
+        - |
+          cp -r src/*.go pcf-pipelines
+          cp -r pcf-pipelines-release/pcf-pipelines/* pcf-pipelines
+
+  - task: test
+    file: src/ci/tasks/test.yml
+
+########### VSPHERE
+
+- name: lock-vsphere
+  serial: true
+  plan:
+  - aggregate:
+    - get: pivnet-rc
+      passed: [test-rc]
+      trigger: true
+    - get: pcf-pipelines
+      passed: [test-rc]
+    - get: rootfs-tag
+      passed: [test-rc]
+
+  - put: vsphere-lock
+    params: { claim: install-pcf }
+    timeout: 3h00m
+
+- name: destroy-rc-vsphere-install
+  plan:
+  - aggregate:
+    - get: pcf-pipelines
+      passed: [ lock-vsphere ]
+    - get: vsphere-lock
+      passed: [ lock-vsphere ]
+      trigger: true
+    - get: pivnet-rc
+      passed: [ lock-vsphere ]
+    - get: rootfs-tag
+      passed: [ lock-vsphere ]
+  - task: destroy-rc-vsphere-install
+    params:
+      PIPELINE_NAME: rc-vsphere-install
+      <<: *vsphere_atc_creds
+    file: pcf-pipelines/ci/tasks/destroy_pipeline.yml
+
+- name: set-rc-vsphere-install
+  plan:
+  - aggregate:
+    - get: pcf-pipelines
+      passed: [ destroy-rc-vsphere-install ]
+    - get: vsphere-lock
+      passed: [ destroy-rc-vsphere-install ]
+      trigger: true
+    - get: pivnet-rc
+      passed: [ destroy-rc-vsphere-install ]
+    - get: rootfs-tag
+      passed: [ destroy-rc-vsphere-install ]
+  - task: unpack-rc
+    file: pcf-pipelines/ci/tasks/unpack_tarball.yml
+    input_mapping: { tarball: pivnet-rc }
+    output_mapping: { unpacked_tarball: release }
+  - task: set-rc-vsphere-install
+    params:
+      PIPELINE_PARAMS: {{rc_vsphere_install_params}}
+      PIPELINE_NAME: rc-vsphere-install
+      PIPELINE_PATH: release/pcf-pipelines/install-pcf/vsphere/pipeline.yml
+      <<: *vsphere_atc_creds
+    file: pcf-pipelines/ci/tasks/set_pipeline.yml
+  - task: unpause-rc-vsphere-install
+    params:
+      PIPELINE_NAME: rc-vsphere-install
+      <<: *vsphere_atc_creds
+    file: pcf-pipelines/ci/tasks/unpause_pipeline.yml
+
+- name: wipe-vsphere
+  plan:
+  - aggregate:
+    - get: pcf-pipelines
+      passed: [ set-rc-vsphere-install ]
+    - get: vsphere-lock
+      passed: [ set-rc-vsphere-install ]
+      trigger: true
+    - get: pivnet-rc
+      passed: [ set-rc-vsphere-install ]
+    - get: rootfs-tag
+      passed: [ set-rc-vsphere-install ]
+  - task: trigger-vsphere-rc-wipe-env
+    file: pcf-pipelines/tasks/trigger-jobs/task.yml
+    params:
+      <<: *vsphere_atc_creds
+      JOBS: |
+        rc-vsphere-install/wipe-env
+  on_failure:
+    <<: *notify_slack
+
+- name: trigger-install-pcf-vsphere
+  plan:
+  - aggregate:
+    - get: pcf-pipelines
+      passed: [ wipe-vsphere ]
+    - get: vsphere-lock
+      passed: [ wipe-vsphere ]
+      trigger: true
+    - get: pivnet-rc
+      passed: [ wipe-vsphere ]
+    - get: rootfs-tag
+      passed: [ wipe-vsphere ]
+  - task: trigger-vsphere-rc-deploy-opsman
+    file: pcf-pipelines/tasks/trigger-jobs/task.yml
+    params:
+      <<: *vsphere_atc_creds
+      JOBS: |
+        rc-vsphere-install/deploy-ert
+  on_failure:
+    <<: *notify_slack
+
+- name: final-wipe-vsphere
+  plan:
+  - aggregate:
+    - get: pcf-pipelines
+      passed: [ trigger-install-pcf-vsphere ]
+      trigger: true
+    - get: vsphere-lock
+      passed: [ trigger-install-pcf-vsphere ]
+    - get: pivnet-rc
+      passed: [ trigger-install-pcf-vsphere ]
+    - get: rootfs-tag
+      passed: [ trigger-install-pcf-vsphere ]
+  - task: trigger-vsphere-rc-wipe-env
+    file: pcf-pipelines/tasks/trigger-jobs/task.yml
+    params:
+      <<: *vsphere_atc_creds
+      JOBS: |
+        rc-vsphere-install/wipe-env
+  - try:
+      put: vsphere-lock
+      params: {release: vsphere-lock}
+  on_failure:
+    <<: *notify_slack
+
+####### END VSPHERE
+########### GCP
+
+- name: lock-gcp
+  serial: true
+  plan:
+  - aggregate:
+    - get: pivnet-rc
+      passed: [test-rc]
+      trigger: true
+    - get: pcf-pipelines
+      passed: [test-rc]
+    - get: rootfs-tag
+      passed: [test-rc]
+  - put: gcp-lock
+    params: { claim: install-pcf }
+    timeout: 3h00m
+
+- name: destroy-rc-gcp-install
+  plan:
+  - aggregate:
+    - get: pcf-pipelines
+      passed: [lock-gcp]
+    - get: gcp-lock
+      passed: [lock-gcp]
+      trigger: true
+    - get: pivnet-rc
+      passed: [lock-gcp]
+    - get: rootfs-tag
+      passed: [lock-gcp]
+  - task: destroy-rc-gcp-install
+    params:
+      PIPELINE_NAME: rc-gcp-install
+      <<: *atc_creds
+    file: pcf-pipelines/ci/tasks/destroy_pipeline.yml
+
+- name: set-rc-gcp-install
+  plan:
+  - aggregate:
+    - get: pcf-pipelines
+      passed: [ destroy-rc-gcp-install ]
+    - get: gcp-lock
+      passed: [ destroy-rc-gcp-install ]
+      trigger: true
+    - get: pivnet-rc
+      passed: [ destroy-rc-gcp-install ]
+    - get: rootfs-tag
+      passed: [ destroy-rc-gcp-install ]
+  - task: unpack-rc
+    file: pcf-pipelines/ci/tasks/unpack_tarball.yml
+    input_mapping: { tarball: pivnet-rc }
+    output_mapping: { unpacked_tarball: release }
+  - task: set-rc-gcp-install
+    params:
+      PIPELINE_PARAMS: {{rc_gcp_install_params}}
+      PIPELINE_NAME: rc-gcp-install
+      PIPELINE_PATH: release/pcf-pipelines/install-pcf/gcp/pipeline.yml
+      <<: *atc_creds
+    file: pcf-pipelines/ci/tasks/set_pipeline.yml
+  - task: unpause-rc-gcp-install
+    params:
+      PIPELINE_NAME: rc-gcp-install
+      <<: *atc_creds
+    file: pcf-pipelines/ci/tasks/unpause_pipeline.yml
+
+- name: wipe-gcp
+  plan:
+  - aggregate:
+    - get: pcf-pipelines
+      passed: [ set-rc-gcp-install ]
+    - get: gcp-lock
+      passed: [ set-rc-gcp-install ]
+      trigger: true
+    - get: pivnet-rc
+      passed: [ set-rc-gcp-install ]
+    - get: rootfs-tag
+      passed: [ set-rc-gcp-install ]
+  - task: trigger-gcp-rc-wipe-env
+    file: pcf-pipelines/tasks/trigger-jobs/task.yml
+    params:
+      <<: *atc_creds
+      JOBS: |
+        rc-gcp-install/wipe-env
+  on_failure:
+    <<: *notify_slack
+
+- name: trigger-install-pcf-gcp
+  plan:
+  - aggregate:
+    - get: pcf-pipelines
+      passed: [ wipe-gcp ]
+    - get: gcp-lock
+      passed: [ wipe-gcp ]
+      trigger: true
+    - get: pivnet-rc
+      passed: [ wipe-gcp ]
+    - get: rootfs-tag
+      passed: [ wipe-gcp ]
+  - task: trigger-gcp-rc-upload-opsman-image
+    file: pcf-pipelines/tasks/trigger-jobs/task.yml
+    params:
+      <<: *atc_creds
+      JOBS: |
+        rc-gcp-install/upload-opsman-image
+  - task: trigger-gcp-rc-create-infrastructure
+    file: pcf-pipelines/tasks/trigger-jobs/task.yml
+    params:
+      <<: *atc_creds
+      JOBS: |
+        rc-gcp-install/create-infrastructure
+  - task: delegate-dns-zone
+    file: pcf-pipelines/ci/tasks/delegate-gcp-dns-zone/task.yml
+    params:
+      GCP_SERVICE_ACCOUNT_KEY: {{gcp_service_account_key}}
+      PARENT_DNS_ZONE: {{gcp_parent_dns_zone}}
+      CHILD_DNS_ZONE: {{gcp_child_dns_zone}}
+  - task: trigger-gcp-rc-configure-director-and-install-pas
+    file: pcf-pipelines/tasks/trigger-jobs/task.yml
+    params:
+      <<: *atc_creds
+      JOBS: |
+        rc-gcp-install/deploy-ert
+  on_failure:
+    <<: *notify_slack
+
+####### GCP upgrade tile
+- name: destroy-rc-gcp-upgrade-pas-tile
+  plan:
+  - aggregate:
+    - get: pcf-pipelines
+      passed: [ trigger-install-pcf-gcp ]
+    - get: gcp-lock
+      passed: [ trigger-install-pcf-gcp ]
+      trigger: true
+    - get: pivnet-rc
+      passed: [ trigger-install-pcf-gcp ]
+    - get: rootfs-tag
+      passed: [ trigger-install-pcf-gcp ]
+  - task: destroy-rc-gcp-upgrade-pas-tile
+    params:
+      PIPELINE_NAME: rc-gcp-upgrade-pas-tile
+      <<: *atc_creds
+    file: pcf-pipelines/ci/tasks/destroy_pipeline.yml
+  on_failure:
+    <<: *notify_slack
+
+- name: set-rc-gcp-upgrade-pas-tile
+  plan:
+  - aggregate:
+    - get: pcf-pipelines
+      passed: [ destroy-rc-gcp-upgrade-pas-tile ]
+    - get: gcp-lock
+      passed: [ destroy-rc-gcp-upgrade-pas-tile ]
+      trigger: true
+    - get: pivnet-rc
+      passed: [ destroy-rc-gcp-upgrade-pas-tile ]
+    - get: rootfs-tag
+      passed: [ destroy-rc-gcp-upgrade-pas-tile ]
+  - task: unpack-rc
+    file: pcf-pipelines/ci/tasks/unpack_tarball.yml
+    input_mapping: { tarball: pivnet-rc }
+    output_mapping: { unpacked_tarball: release }
+  - task: set-rc-gcp-upgrade-pas-tile
+    params:
+      PIPELINE_PARAMS: {{rc_gcp_upgrade_pas_tile_params}}
+      PIPELINE_NAME: rc-gcp-upgrade-pas-tile
+      PIPELINE_PATH: release/pcf-pipelines/upgrade-tile/pipeline.yml
+      <<: *atc_creds
+    file: pcf-pipelines/ci/tasks/set_pipeline.yml
+  - task: unpause-rc-gcp-upgrade-pas-tile
+    params:
+      PIPELINE_NAME: rc-gcp-upgrade-pas-tile
+      <<: *atc_creds
+    file: pcf-pipelines/ci/tasks/unpause_pipeline.yml
+  on_failure:
+    <<: *notify_slack
+
+- name: trigger-rc-gcp-upgrade-pas-tile
+  plan:
+  - aggregate:
+    - get: pcf-pipelines
+      passed: [ set-rc-gcp-upgrade-pas-tile ]
+    - get: gcp-lock
+      passed: [ set-rc-gcp-upgrade-pas-tile ]
+      trigger: true
+    - get: pivnet-rc
+      passed: [ set-rc-gcp-upgrade-pas-tile ]
+    - get: rootfs-tag
+      passed: [ set-rc-gcp-upgrade-pas-tile ]
+  - task: trigger-pas-tile
+    file: pcf-pipelines/tasks/trigger-jobs/task.yml
+    params:
+      <<: *atc_creds
+      JOBS: |
+        rc-gcp-upgrade-pas-tile/upload-and-stage-tile
+        rc-gcp-upgrade-pas-tile/apply-changes
+  on_failure:
+    <<: *notify_slack
+
+- name: final-wipe-gcp
+  plan:
+  - aggregate:
+    - get: pcf-pipelines
+      passed: [ trigger-rc-gcp-upgrade-pas-tile ]
+      trigger: true
+    - get: gcp-lock
+      passed: [ trigger-rc-gcp-upgrade-pas-tile ]
+    - get: pivnet-rc
+      passed: [ trigger-rc-gcp-upgrade-pas-tile ]
+    - get: rootfs-tag
+      passed: [ trigger-rc-gcp-upgrade-pas-tile ]
+  - do:
+    - task: trigger-gcp-rc-wipe-env
+      file: pcf-pipelines/tasks/trigger-jobs/task.yml
+      params:
+        <<: *atc_creds
+        JOBS: |
+          rc-gcp-install/wipe-env
+    - task: cleanup-upgraded-opsmanagers
+      config:
+        platform: linux
+        image_resource:
+          type: docker-image
+          source:
+            repository: google/cloud-sdk
+        params:
+          GCP_SERVICE_ACCOUNT_KEY: {{gcp_service_account_key}}
+        run:
+          path: bash
+          args:
+          - -c
+          - |
+            set -eu
+
+            gcloud auth activate-service-account --key-file <(echo "$GCP_SERVICE_ACCOUNT_KEY")
+            gcloud compute instances list --filter="rc AND ops-man AND TERMINATED" | \
+              awk 'NR > 1
+                {
+                  system("gcloud compute instances delete --delete-disks=all " $1 " --quiet --zone " $2)
+                }'
+
+  - try:
+      put: gcp-lock
+      params: {release: gcp-lock}
+  on_failure:
+    <<: *notify_slack
+
+####### END GCP upgrade tile
+####### END GCP
+
+####### GCP LRE
+- name: lock-gcp-lre
+  serial: true
+  plan:
+  - aggregate:
+    - get: pivnet-rc
+      passed: [test-rc]
+      trigger: true
+    - get: pcf-pipelines
+      passed: [test-rc]
+    - get: rootfs-tag
+      passed: [test-rc]
+  - put: gcp-lock
+    params: { claim: lre-gcp }
+    timeout: 3h00m
+
+- name: destroy-lre-gcp-upgrade-ops-manager
+  plan:
+  - aggregate:
+    - get: pcf-pipelines
+      passed: [ lock-gcp-lre ]
+    - get: gcp-lock
+      passed: [lock-gcp-lre]
+      trigger: true
+    - get: pivnet-rc
+      passed: [ lock-gcp-lre ]
+    - get: rootfs-tag
+      passed: [ lock-gcp-lre ]
+  - task: destroy-rc-gcp-install
+    params:
+      PIPELINE_NAME: lre-gcp-upgrade-ops-manager
+      <<: *atc_creds
+    file: pcf-pipelines/ci/tasks/destroy_pipeline.yml
+  on_failure:
+    <<: *notify_slack
+
+- name: set-lre-gcp-upgrade-ops-manager
+  plan:
+  - aggregate:
+    - get: pcf-pipelines
+      passed: [ destroy-lre-gcp-upgrade-ops-manager ]
+    - get: gcp-lock
+      passed: [destroy-lre-gcp-upgrade-ops-manager]
+      trigger: true
+    - get: pivnet-rc
+      passed: [ destroy-lre-gcp-upgrade-ops-manager ]
+    - get: rootfs-tag
+      passed: [ destroy-lre-gcp-upgrade-ops-manager ]
+  - task: unpack-rc
+    file: pcf-pipelines/ci/tasks/unpack_tarball.yml
+    input_mapping: { tarball: pivnet-rc }
+    output_mapping: { unpacked_tarball: release }
+  - task: set-rc-gcp-install
+    params:
+      PIPELINE_PARAMS: {{rc_lre_gcp_upgrade_ops_manager_params}}
+      PIPELINE_NAME: lre-gcp-upgrade-ops-manager
+      PIPELINE_PATH: release/pcf-pipelines/upgrade-ops-manager/gcp/pipeline.yml
+      <<: *atc_creds
+    file: pcf-pipelines/ci/tasks/set_pipeline.yml
+  - task: unpause-rc-gcp-install
+    params:
+      PIPELINE_NAME: lre-gcp-upgrade-ops-manager
+      <<: *atc_creds
+    file: pcf-pipelines/ci/tasks/unpause_pipeline.yml
+  on_failure:
+    <<: *notify_slack
+
+- name: trigger-lre-gcp-upgrade-ops-manager
+  plan:
+  - aggregate:
+    - get: pcf-pipelines
+      passed: [ set-lre-gcp-upgrade-ops-manager ]
+    - get: gcp-lock
+      passed: [ set-lre-gcp-upgrade-ops-manager ]
+      trigger: true
+    - get: pivnet-rc
+      passed: [ set-lre-gcp-upgrade-ops-manager ]
+    - get: rootfs-tag
+      passed: [ set-lre-gcp-upgrade-ops-manager ]
+  - task: trigger-opsman
+    file: pcf-pipelines/tasks/trigger-jobs/task.yml
+    params:
+      <<: *atc_creds
+      JOBS: |
+        lre-gcp-upgrade-ops-manager/upgrade-opsmgr
+  on_failure:
+    <<: *notify_slack
+
+- name: cleanup-gcp-lre
+  plan:
+  - aggregate:
+    - get: pcf-pipelines
+      passed: [ trigger-lre-gcp-upgrade-ops-manager ]
+      trigger: true
+    - get: gcp-lock
+      passed: [ trigger-lre-gcp-upgrade-ops-manager ]
+    - get: pivnet-rc
+      passed: [ trigger-lre-gcp-upgrade-ops-manager ]
+    - get: rootfs-tag
+      passed: [ trigger-lre-gcp-upgrade-ops-manager ]
+
+
+  - task: cleanup-upgraded-opsmanagers
+    config:
+      platform: linux
+      image_resource:
+        type: docker-image
+        source:
+          repository: google/cloud-sdk
+      params:
+        GCP_SERVICE_ACCOUNT_KEY: {{gcp_service_account_key}}
+      run:
+        path: bash
+        args:
+        - -c
+        - |
+          set -eu
+
+          gcloud auth activate-service-account --key-file <(echo "$GCP_SERVICE_ACCOUNT_KEY")
+          gcloud compute instances list --filter="lre AND ops-man AND TERMINATED" | \
+            awk 'NR > 1
+              {
+                system("gcloud compute instances delete --delete-disks=all " $1 " --quiet --zone " $2)
+              }'
+
+
+####### END GCP LRE
+
+####### Azure
+
+- name: lock-azure
+  serial: true
+  plan:
+  - aggregate:
+    - get: pivnet-rc
+      passed: [test-rc]
+      trigger: true
+    - get: pcf-pipelines
+      passed: [test-rc]
+    - get: rootfs-tag
+      passed: [test-rc]
+  - put: azure-lock
+    params: { claim: install-pcf }
+    timeout: 3h00m
+
+- name: destroy-rc-azure-install
+  plan:
+  - aggregate:
+    - get: pcf-pipelines
+      passed: [lock-azure]
+    - get: azure-lock
+      passed: [lock-azure]
+      trigger: true
+    - get: pivnet-rc
+      passed: [lock-azure]
+    - get: rootfs-tag
+      passed: [lock-azure]
+  - task: destroy-rc-azure-install
+    params:
+      PIPELINE_NAME: rc-azure-install
+      <<: *atc_creds
+    file: pcf-pipelines/ci/tasks/destroy_pipeline.yml
+
+- name: set-rc-azure-install
+  plan:
+  - aggregate:
+    - get: pcf-pipelines
+      passed: [ destroy-rc-azure-install ]
+    - get: azure-lock
+      passed: [ destroy-rc-azure-install ]
+      trigger: true
+    - get: pivnet-rc
+      passed: [ destroy-rc-azure-install ]
+    - get: rootfs-tag
+      passed: [ destroy-rc-azure-install ]
+  - task: unpack-rc
+    file: pcf-pipelines/ci/tasks/unpack_tarball.yml
+    input_mapping: { tarball: pivnet-rc }
+    output_mapping: { unpacked_tarball: release }
+  - task: set-rc-azure-install
+    params:
+      PIPELINE_PARAMS: {{rc_azure_install_params}}
+      PIPELINE_NAME: rc-azure-install
+      PIPELINE_PATH: release/pcf-pipelines/install-pcf/azure/pipeline.yml
+      <<: *atc_creds
+    file: pcf-pipelines/ci/tasks/set_pipeline.yml
+  - task: unpause-rc-azure-install
+    params:
+      PIPELINE_NAME: rc-azure-install
+      <<: *atc_creds
+    file: pcf-pipelines/ci/tasks/unpause_pipeline.yml
+
+- name: wipe-azure
+  plan:
+  - aggregate:
+    - get: pcf-pipelines
+      passed: [ set-rc-azure-install ]
+    - get: azure-lock
+      passed: [ set-rc-azure-install ]
+      trigger: true
+    - get: pivnet-rc
+      passed: [ set-rc-azure-install ]
+    - get: rootfs-tag
+      passed: [ set-rc-azure-install ]
+  - task: trigger-azure-rc-wipe-env
+    file: pcf-pipelines/tasks/trigger-jobs/task.yml
+    params:
+      <<: *atc_creds
+      JOBS: |
+        rc-azure-install/wipe-env
+  on_failure:
+    <<: *notify_slack
+
+- name: trigger-install-pcf-azure
+  plan:
+  - aggregate:
+    - get: pcf-pipelines
+      passed: [ wipe-azure ]
+    - get: azure-lock
+      passed: [ wipe-azure ]
+      trigger: true
+    - get: pivnet-rc
+      passed: [ wipe-azure ]
+    - get: rootfs-tag
+      passed: [ wipe-azure ]
+  - task: trigger-azure-rc-create-infrastructure
+    file: pcf-pipelines/tasks/trigger-jobs/task.yml
+    params:
+      <<: *atc_creds
+      JOBS: |
+        rc-azure-install/create-infrastructure
+  - task: delegate-dns-zone
+    file: pcf-pipelines/ci/tasks/delegate-azure-dns-zone/task.yml
+    params:
+      AZURE_CLIENT_ID: {{azure_client_id}}
+      AZURE_CLIENT_SECRET: {{azure_client_secret}}
+      AZURE_TENANT_ID: {{azure_tenant_id}}
+      PARENT_RESOURCE_GROUP: {{azure_parent_dns_resource_group}}
+      PARENT_DNS_ZONE: {{azure_parent_dns_zone}}
+      CHILD_RESOURCE_GROUP: {{azure_child_dns_resource_group}}
+      CHILD_DNS_ZONE_NAME: {{azure_child_dns_zone_name}}
+  - task: trigger-azure-rc-config-opsman-auth
+    file: pcf-pipelines/tasks/trigger-jobs/task.yml
+    params:
+      <<: *atc_creds
+      JOBS: |
+        rc-azure-install/config-opsman-auth
+  - task: trigger-azure-rc-config-director
+    file: pcf-pipelines/tasks/trigger-jobs/task.yml
+    params:
+      <<: *atc_creds
+      JOBS: |
+        rc-azure-install/config-director
+        rc-azure-install/deploy-ert
+  on_failure:
+    <<: *notify_slack
+
+- name: final-wipe-azure
+  plan:
+  - aggregate:
+    - get: pcf-pipelines
+      passed: [ trigger-install-pcf-azure ]
+      trigger: true
+    - get: azure-lock
+      passed: [ trigger-install-pcf-azure ]
+    - get: pivnet-rc
+      passed: [ trigger-install-pcf-azure ]
+    - get: rootfs-tag
+      passed: [ trigger-install-pcf-azure ]
+  - task: trigger-azure-rc-wipe-env
+    file: pcf-pipelines/tasks/trigger-jobs/task.yml
+    params:
+      <<: *atc_creds
+      JOBS: |
+        rc-azure-install/wipe-env
+  - try:
+      put: azure-lock
+      params: {release: azure-lock}
+  on_failure:
+    <<: *notify_slack
+
+####### END Azure
+####### AWS
+
+- name: lock-aws
+  serial: true
+  plan:
+  - aggregate:
+    - get: pivnet-rc
+      passed: [test-rc]
+      trigger: true
+    - get: pcf-pipelines
+      passed: [test-rc]
+    - get: rootfs-tag
+      passed: [test-rc]
+  - put: aws-lock
+    params: { claim: install-pcf }
+    timeout: 3h00m
+
+- name: destroy-rc-aws-install
+  plan:
+  - aggregate:
+    - get: pcf-pipelines
+      passed: [lock-aws]
+    - get: aws-lock
+      passed: [lock-aws]
+      trigger: true
+    - get: pivnet-rc
+      passed: [lock-aws]
+    - get: rootfs-tag
+      passed: [lock-aws]
+  - task: destroy-rc-aws-install
+    params:
+      PIPELINE_NAME: rc-aws-install
+      <<: *atc_creds
+    file: pcf-pipelines/ci/tasks/destroy_pipeline.yml
+
+- name: set-rc-aws-install
+  plan:
+  - aggregate:
+    - get: pcf-pipelines
+      passed: [ destroy-rc-aws-install ]
+    - get: aws-lock
+      passed: [ destroy-rc-aws-install ]
+      trigger: true
+    - get: pivnet-rc
+      passed: [ destroy-rc-aws-install ]
+    - get: rootfs-tag
+      passed: [ destroy-rc-aws-install ]
+  - task: unpack-rc
+    file: pcf-pipelines/ci/tasks/unpack_tarball.yml
+    input_mapping: { tarball: pivnet-rc }
+    output_mapping: { unpacked_tarball: release }
+  - task: set-rc-aws-install
+    params:
+      PIPELINE_PARAMS: {{rc_aws_install_params}}
+      PIPELINE_NAME: rc-aws-install
+      PIPELINE_PATH: release/pcf-pipelines/install-pcf/aws/pipeline.yml
+      <<: *atc_creds
+    file: pcf-pipelines/ci/tasks/set_pipeline.yml
+  - task: unpause-rc-aws-install
+    params:
+      PIPELINE_NAME: rc-aws-install
+      <<: *atc_creds
+    file: pcf-pipelines/ci/tasks/unpause_pipeline.yml
+
+- name: wipe-aws
+  plan:
+  - aggregate:
+    - get: pcf-pipelines
+      passed: [ set-rc-aws-install ]
+    - get: aws-lock
+      passed: [ set-rc-aws-install ]
+      trigger: true
+    - get: pivnet-rc
+      passed: [ set-rc-aws-install ]
+    - get: rootfs-tag
+      passed: [ set-rc-aws-install ]
+  - task: trigger-aws-rc-wipe-env
+    file: pcf-pipelines/tasks/trigger-jobs/task.yml
+    params:
+      <<: *atc_creds
+      JOBS: |
+        rc-aws-install/wipe-env
+  on_failure:
+    <<: *notify_slack
+
+- name: trigger-install-pcf-aws
+  plan:
+  - aggregate:
+    - get: pcf-pipelines
+      passed: [ wipe-aws ]
+    - get: aws-lock
+      passed: [ wipe-aws ]
+      trigger: true
+    - get: pivnet-rc
+      passed: [ wipe-aws ]
+    - get: rootfs-tag
+      passed: [ wipe-aws ]
+  - task: trigger-aws-rc-create-infrastructure
+    file: pcf-pipelines/tasks/trigger-jobs/task.yml
+    params:
+      <<: *atc_creds
+      JOBS: |
+        rc-aws-install/create-infrastructure
+        rc-aws-install/deploy-ert
+  on_failure:
+    <<: *notify_slack
+
+- name: final-wipe-aws
+  plan:
+  - aggregate:
+    - get: pcf-pipelines
+      passed: [ trigger-install-pcf-aws ]
+      trigger: true
+    - get: aws-lock
+      passed: [ trigger-install-pcf-aws ]
+    - get: pivnet-rc
+      passed: [ trigger-install-pcf-aws ]
+    - get: rootfs-tag
+      passed: [ trigger-install-pcf-aws ]
+  - task: trigger-aws-rc-wipe-env
+    file: pcf-pipelines/tasks/trigger-jobs/task.yml
+    params:
+      <<: *atc_creds
+      JOBS: |
+        rc-aws-install/wipe-env
+  - try:
+      put: aws-lock
+      params: {release: aws-lock}
+  on_failure:
+    <<: *notify_slack
+
+####### END AWS
+
+- name: check-environments-complete
+  serial: true
+  plan:
+  - aggregate:
+    - get: pcf-pipelines
+      passed:
+      - trigger-install-pcf-vsphere
+      - trigger-install-pcf-azure
+      - trigger-install-pcf-aws
+      - trigger-install-pcf-gcp
+      - trigger-lre-gcp-upgrade-ops-manager
+    - get: pivnet-rc
+      passed:
+      - trigger-install-pcf-vsphere
+      - trigger-install-pcf-azure
+      - trigger-install-pcf-aws
+      - trigger-install-pcf-gcp
+      - trigger-lre-gcp-upgrade-ops-manager
+      trigger: true
+    - get: rootfs-tag
+      passed:
+      - trigger-install-pcf-vsphere
+      - trigger-install-pcf-azure
+      - trigger-install-pcf-aws
+      - trigger-install-pcf-gcp
+      - trigger-lre-gcp-upgrade-ops-manager
+  - aggregate:
+    - do:
+      - task: check-lre-gcp-upgrade-ops-manager
+        file: pcf-pipelines/ci/tasks/check-environments/task.yml
+        params:
+          PIPELINE: lre-gcp-upgrade-ops-manager
+          JOB: upgrade-opsmgr
+          TIMEOUT_MINUTES: 240
+          DISABLE_PIVNET_VERSION_CHECK: false
+          <<: *atc_creds
+      - get: lre-gcp-lock
+        resource: gcp-lock
+        passed: [trigger-lre-gcp-upgrade-ops-manager]
+      - try:
+          put: lre-gcp-lock
+          resource: gcp-lock
+          params: {release: lre-gcp-lock}
+    - do:
+      - task: check-gcp
+        file: pcf-pipelines/ci/tasks/check-environments/task.yml
+        params:
+          PIPELINE: rc-gcp-install
+          JOB: deploy-ert
+          TIMEOUT_MINUTES: 240
+          DISABLE_PIVNET_VERSION_CHECK: false
+          <<: *atc_creds
+    - do:
+      - task: check-vsphere
+        file: pcf-pipelines/ci/tasks/check-environments/task.yml
+        params:
+          PIPELINE: rc-vsphere-install
+          JOB: deploy-ert
+          TIMEOUT_MINUTES: 240
+          DISABLE_PIVNET_VERSION_CHECK: false
+          <<: *vsphere_atc_creds
+    - do:
+      - task: check-azure
+        file: pcf-pipelines/ci/tasks/check-environments/task.yml
+        params:
+          PIPELINE: rc-azure-install
+          JOB: deploy-ert
+          TIMEOUT_MINUTES: 240
+          DISABLE_PIVNET_VERSION_CHECK: false
+          <<: *atc_creds
+    - do:
+      - task: check-aws
+        file: pcf-pipelines/ci/tasks/check-environments/task.yml
+        params:
+          PIPELINE: rc-aws-install
+          JOB: deploy-ert
+          TIMEOUT_MINUTES: 240
+          DISABLE_PIVNET_VERSION_CHECK: false
+          <<: *atc_creds
+
+- name: publish-release
+  serial_groups: [version]
+  plan:
+  - aggregate:
+    - get: version
+      params: {bump: final}
+    - get: pcf-pipelines
+      passed: [check-environments-complete]
+    - get: pivnet-rc
+      passed: [check-environments-complete]
+    - get: fly
+    - get: rootfs-tag
+  - task: create-release
+    file: pcf-pipelines/ci/tasks/create-release/task.yml
+    params:
+      AVAILABILITY: Selected User Groups Only
+
+  - put: pivnet-release
+    params:
+      metadata_file: pivnet-metadata/metadata.yml
+      file_glob: pcf-pipelines-release-tarball/*.tgz
+      s3_filepath_prefix: {{pivnet_s3_filepath_prefix}}
+
+  - put: pcf-pipelines
+    params:
+      repository: pcf-pipelines
+      tag: version/version
+      tag_prefix: v
+      only_tag: true
+
+  on_failure:
+    <<: *notify_slack
+  on_success:
+    do:
+    - task: create-slack-notification
+      config:
+        platform: linux
+        image_resource:
+          type: docker-image
+          source:
+            repository: concourse/buildroot
+            tag: curl
+        inputs:
+        - name: pivnet-release
+        outputs:
+        - name: notification-text
+        run:
+          path: bash
+          args:
+          - -c
+          - |
+            set -eu
+
+            release_id=$(cat pivnet-release/metadata.json | jq .Release.ID)
+            cat > notification-text/text <<EOF
+              Deployed pcf-pipelines final release to https://network.pivotal.io/products/pcf-automation#/releases/$release_id
+            EOF
+    - put: slack
+      params:
+        text_file: notification-text/text
+        silent: true
+
+    - put: version
+      params: {bump: final}
+
+    - put: version
+      params: {bump: patch, pre: rc}
+
+####### VSPHERE OFFLINE
+
+- name: lock-vsphere-offline
+  serial: true
+  plan:
+  - aggregate:
+    - get: daily
+      trigger: true
+    - get: pivnet-rc
+      passed: [test-rc]
+    - get: pcf-pipelines
+      passed: [test-rc]
+    - get: rootfs-tag
+      passed: [test-rc]
+  - put: vsphere-offline-lock
+    params: { claim: install-pcf }
+    timeout: 3h00m
+
+- name: destroy-rc-vsphere-offline-install
+  plan:
+  - aggregate:
+    - get: pcf-pipelines
+      passed: [ lock-vsphere-offline ]
+    - get: vsphere-offline-lock
+      passed: [ lock-vsphere-offline ]
+      trigger: true
+    - get: pivnet-rc
+      passed: [ lock-vsphere-offline ]
+    - get: rootfs-tag
+      passed: [ lock-vsphere-offline ]
+  - task: destroy-rc-vsphere-offline-install
+    params:
+      PIPELINE_NAME: {{rc_offline_pipeline_name}}
+      <<: *vsphere_atc_creds
+    file: pcf-pipelines/ci/tasks/destroy_pipeline.yml
+
+- name: set-offline-pipelines
+  plan:
+  - aggregate:
+    - get: pcf-pipelines
+      passed: [ destroy-rc-vsphere-offline-install ]
+    - get: vsphere-offline-lock
+      passed: [ destroy-rc-vsphere-offline-install ]
+      trigger: true
+    - get: pivnet-rc
+      passed: [ destroy-rc-vsphere-offline-install ]
+    - get: rootfs-tag
+      passed: [ destroy-rc-vsphere-offline-install ]
+
+  - task: unpack-rc
+    file: pcf-pipelines/ci/tasks/unpack_tarball.yml
+    input_mapping: { tarball: pivnet-rc }
+    output_mapping: { unpacked_tarball: release }
+
+  - task: set-create-offline-pinned-pipelines-pipeline
+    params:
+      PIPELINE_PARAMS: {{create_offline_pinned_pipelines_params}}
+      PIPELINE_NAME: create-offline-pinned-pipelines
+      PIPELINE_PATH: release/pcf-pipelines/create-offline-pinned-pipelines/pipeline.yml
+      <<: *vsphere_atc_creds
+    file: pcf-pipelines/ci/tasks/set_pipeline.yml
+
+  - task: apply-unpack-pcf-pipelines-combined-patches
+    file: pcf-pipelines/ci/tasks/apply-patch/task.yml
+    input_mapping: { unpatched-release: release }
+    output_mapping: { patched-release: release }
+    params:
+      PIPELINE_FILE: unpatched-release/pcf-pipelines/unpack-pcf-pipelines-combined/pipeline.yml
+      PATCH_FILES: |
+        pcf-pipelines/ci/operations/add-set-pipeline-trigger-on-unpack-pipeline.yml
+
+  - task: set-unpack-pcf-pipelines-combined
+    params:
+      PIPELINE_PARAMS: {{unpack_pcf_pipelines_combined_params}}
+      PIPELINE_NAME: unpack-pcf-pipelines-combined
+      PIPELINE_PATH: release/pcf-pipelines/unpack-pcf-pipelines-combined/pipeline.yml
+      <<: *vsphere_atc_creds
+    file: pcf-pipelines/ci/tasks/set_pipeline.yml
+
+- name: trigger-create-offline-pinned-pipelines
+  plan:
+  - aggregate:
+    - get: pcf-pipelines
+      passed: [ set-offline-pipelines ]
+    - get: vsphere-offline-lock
+      passed: [ set-offline-pipelines ]
+      trigger: true
+    - get: pivnet-rc
+      passed: [ set-offline-pipelines ]
+    - get: rootfs-tag
+      passed: [ set-offline-pipelines ]
+  - task: trigger-create-offline-pinned-pipelines
+    params:
+      <<: *vsphere_atc_creds
+      JOBS: |
+        create-offline-pinned-pipelines/collector
+        create-offline-pinned-pipelines/create-pcf-pipelines-combined
+    file: pcf-pipelines/tasks/trigger-jobs/task.yml
+
+- name: trigger-unpack-pipelines-combined
+  plan:
+  - aggregate:
+    - get: pcf-pipelines
+      passed: [ trigger-create-offline-pinned-pipelines ]
+    - get: vsphere-offline-lock
+      passed: [ trigger-create-offline-pinned-pipelines ]
+      trigger: true
+    - get: pivnet-rc
+      passed: [ trigger-create-offline-pinned-pipelines ]
+    - get: rootfs-tag
+      passed: [ trigger-create-offline-pinned-pipelines ]
+  - task: trigger-unpack-pipelines-combined
+    params:
+      <<: *vsphere_atc_creds
+      JOBS: |
+        unpack-pcf-pipelines-combined/unpack-tarball
+        unpack-pcf-pipelines-combined/set-install-pcf-pipeline
+    file: pcf-pipelines/tasks/trigger-jobs/task.yml
+
+- name: wipe-vsphere-offline
+  plan:
+  - aggregate:
+    - get: pcf-pipelines
+      passed: [ trigger-unpack-pipelines-combined ]
+    - get: vsphere-offline-lock
+      passed: [ trigger-unpack-pipelines-combined ]
+      trigger: true
+    - get: pivnet-rc
+      passed: [ trigger-unpack-pipelines-combined ]
+    - get: rootfs-tag
+      passed: [ trigger-unpack-pipelines-combined ]
+  - task: check-pipeline-exists
+    params:
+      <<: *vsphere_atc_creds
+      PIPELINE_NAME: {{rc_offline_pipeline_name}}
+      TIMEOUT_MINUTES: 5
+    file: pcf-pipelines/ci/tasks/check-pipeline-exists/task.yml
+  - task: unpause-rc-vsphere-offline-install
+    params:
+      PIPELINE_NAME: {{rc_offline_pipeline_name}}
+      <<: *vsphere_atc_creds
+    file: pcf-pipelines/ci/tasks/unpause_pipeline.yml
+  - task: trigger-rc-vsphere-offline-wipe-env
+    file: pcf-pipelines/tasks/trigger-jobs/task.yml
+    params:
+      <<: *vsphere_atc_creds
+      JOBS: |
+        ((rc_offline_pipeline_name))/wipe-env
+  on_failure:
+    <<: *notify_slack
+
+- name: trigger-install-pcf-vsphere-offline
+  plan:
+  - aggregate:
+    - get: pcf-pipelines
+      passed: [ wipe-vsphere-offline ]
+    - get: vsphere-offline-lock
+      passed: [ wipe-vsphere-offline ]
+      trigger: true
+    - get: pivnet-rc
+      passed: [ wipe-vsphere-offline ]
+    - get: rootfs-tag
+      passed: [ wipe-vsphere-offline ]
+  - task: trigger-rc-vsphere-offline-deploy-opsman
+    file: pcf-pipelines/tasks/trigger-jobs/task.yml
+    params:
+      <<: *vsphere_atc_creds
+      JOBS: |
+        ((rc_offline_pipeline_name))/deploy-opsman
+        ((rc_offline_pipeline_name))/deploy-ert
+  - try:
+      put: vsphere-offline-lock
+      params: {release: vsphere-offline-lock}
+  on_failure:
+    <<: *notify_slack
+####### END VSPHERE OFFLINE
+
+atc_creds: &atc_creds
+  ATC_EXTERNAL_URL: {{atc_external_url}}
+  ATC_BASIC_AUTH_USERNAME: {{fly_basic_auth_username}}
+  ATC_BASIC_AUTH_PASSWORD: {{fly_basic_auth_password}}
+  ATC_TEAM_NAME: {{atc_team_name}}
+
+vsphere_atc_creds: &vsphere_atc_creds
+  ATC_EXTERNAL_URL: {{atc_external_url}}
+  ATC_BASIC_AUTH_USERNAME: {{fly_basic_auth_username}}
+  ATC_BASIC_AUTH_PASSWORD: {{fly_basic_auth_password}}
+  ATC_TEAM_NAME: vsphere
+
+notify_slack: &notify_slack
+  put: slack
+  params:
+    text: "$BUILD_PIPELINE_NAME/$BUILD_JOB_NAME failed: $ATC_EXTERNAL_URL/builds/$BUILD_ID"
+
+norm-ci-locks-params: &norm-ci-locks-params
+  uri: git@github.com:pivotal-cf/norm-ci-locks.git
+  branch: master
+  private_key: {{locks_git_ssh_key}}
+  retry_delay: 1m

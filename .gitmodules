@@ -1,6 +1,0 @@
-[submodule "pcf-pipelines"]
-	path = pcf-pipelines
-	url = git@github.com:evandbrown/pcf-pipelines.git
-[submodule "bbl-overlays"]
-	path = bbl-overlays
-	url = git@github.com:evandbrown/bbl-overlays.git

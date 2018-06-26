@@ -1,0 +1,27 @@
+- op: replace
+  path: /name=tile/name
+  value: elastic-runtime
+
+- op: replace
+  path: /product_slug={{product_slug}}/product_slug
+  value: elastic-runtime
+
+- op: replace
+  path: /resource=tile/resource
+  value: elastic-runtime
+
+- op: replace
+  path: /get=tile/get
+  value: elastic-runtime
+
+- op: replace
+  path: /jobs/name=upload-and-stage-tile/name
+  value: upload-and-stage-ert
+
+- op: replace
+  path: /jobs/name=upload-and-stage-ert/task=upload-tile-and-stemcell/task
+  value: upload-ert-and-stemcell
+
+- op: replace
+  path: /jobs/name=apply-changes/plan/0/aggregate/get=pivnet-product/passed
+  value: [upload-and-stage-ert]

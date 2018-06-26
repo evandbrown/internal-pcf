@@ -42,6 +42,7 @@ resource "google_compute_instance_group" "internal_concourse_web" {
 resource "google_compute_firewall" "internal_concourse_web" {
   name    = "internal-concourse-web"
   network = "${data.google_compute_network.bbl-network.self_link}"
+  project = "${var.existing-host-project}"
 
   allow {
     protocol = "tcp"

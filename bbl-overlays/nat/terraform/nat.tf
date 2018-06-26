@@ -3,6 +3,7 @@ module "nat" {
   network    = "${data.google_compute_network.bbl-network.name}"
   subnetwork = "${data.google_compute_subnetwork.bbl-subnet.name}"
   region     = "${var.region}"
+  project    = "${var.existing-host-project}"
 }
 
 output "nat_routing_tag" {

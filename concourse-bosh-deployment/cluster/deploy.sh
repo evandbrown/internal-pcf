@@ -9,6 +9,7 @@ bosh deploy -d concourse concourse.yml \
   -o operations/tls-vars.yml \
   -o operations/web-network-extension.yml \
   -o operations/credhub.yml \
+  -o operations/worker-ephemeral-disk.yml \
   --var network_name=default \
   --var web_vm_type=default \
   --var db_vm_type=default \
@@ -20,3 +21,4 @@ bosh deploy -d concourse concourse.yml \
   --var atc_basic_auth.username=<CHANGE> \
   --var atc_basic_auth.password=<CHANGE> \
   --var external_url=https://<CHANGE>
+  --var worker_ephemeral_disk=500GB_ephemeral_disk

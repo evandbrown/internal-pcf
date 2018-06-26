@@ -1,9 +1,9 @@
 - type: replace
   path: /instance_groups/name=web/jobs/name=atc/properties/credhub?
   value:
-    url: ((credhub_url))
-    client_id: ((credhub_client_id))
-    client_secret: ((credhub_client_secret))
+    url: ((ilb_url)):8443
+    client_id: director_to_credhub
+    client_secret: ((credhub_admin_client_secret))
     tls:
       ca_cert:
-        certificate: ((credhub_ca_cert))
+        certificate: ((credhub_ca.certificate))

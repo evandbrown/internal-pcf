@@ -1,12 +1,14 @@
 bosh deploy -d concourse concourse.yml \
   -l ../versions.yml \
+  -l "/tmp/env-stage-internal-pcf/vars/director-vars-store.yml" \
   --vars-store cluster-creds.yml \
-  -o operations/no-auth.yml \
+  -o operations/basic-auth.yml \
   -o operations/privileged-http.yml \
   -o operations/privileged-https.yml \
   -o operations/tls.yml \
   -o operations/tls-vars.yml \
   -o operations/web-network-extension.yml \
+  -o operations/credhub.yml \
   --var network_name=default \
   --var web_vm_type=default \
   --var db_vm_type=default \
@@ -15,6 +17,6 @@ bosh deploy -d concourse concourse.yml \
   --var deployment_name=concourse \
   --var web_network_name=private \
   --var web_network_vm_extension=ilb \
-  --var atc_basic_auth.username=admin \
-  --var atc_basic_auth.password=admin \
-  --var external_url=https://10.100.0.100
+  --var atc_basic_auth.username=<CHANGE> \
+  --var atc_basic_auth.password=<CHANGE> \
+  --var external_url=https://<CHANGE>

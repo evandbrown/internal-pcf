@@ -1,3 +1,54 @@
+This document describes how to use the `internal-pcf` repository to:
+1. Provision a Concourse installation that prioritizes private networking. A NAT VM and jumpbox are the only two resources that have public addresses.
+1. Deploy a Pivotal Cloud Foundry installation (via a Concourse pipeline) that prioritizes private networking. A trio of NAT VMs and the Operations Manager VM are the only resources that have public addresses.
+
+# Pre-work
+1. Install the [BOSH Bootloader](https://github.com/cloudfoundry/bosh-bootloader) and its dependencies.
+1. Install `direnv`
+1. Clone this repository
+
+# Deploying Concourse
+1. Create a new directory with the structure required to apply customizations:
+  ```
+  mkdir env-stage-internal-pcf && cd !$
+  export BBL_DIR=$(pwd)
+  ```
+
+1. Initialize the directory as a git repository:
+  ```
+  git init
+  ```
+
+1. From the directory where you cloned this repository, run the following command to copy the customizations in:
+  ```
+  cd bbl-overlays
+  cp .envrc ${BBL_DIR}
+  cp byo-network/create-director-override.sh ${BBL_DIR} 
+  for dir in byo-network internal-tcp-lb nat; do
+    pushd ${dir}
+      rsync -avzh --ignore-errors terraform ${BBL_DIR}
+      rsync -avzh --ignore-errors vars ${BBL_DIR}
+      rsync -avzh --ignore-errors cloud-config ${BBL_DIR}
+    popd
+  done
+  ```
+
+1. Go to the directory you created earlier and use `bbl` to provision a BOSH director:
+  ```
+  cd ${BBL_DIR}
+  bbl plan --name <CHANGE>
+  bbl up
+  ```
+
+1. Load the creds and upload a stemcell:
+  ```
+  eval "$(bbl print-env)"
+  bosh upload-stemcell --sha1 7333cc0d2042cd7b167a7d57c03f38562cd4e01c \
+	https://bosh.io/d/stemcells/bosh-google-kvm-ubuntu-trusty-go_agent?v=3586.24
+  ```
+
+1. Navigate to `concourse-bosh-deployment/cluster` and run `deploy.sh`
+
 # High-level overview
 1. Use `bbl` to install BOSH
 2. Download stemcell and Concourse releases

@@ -7,6 +7,7 @@ bosh deploy -d concourse concourse.yml \
   -o operations/tls.yml \
   -o operations/tls-vars.yml \
   -o operations/web-network-extension.yml \
+  -o operations/worker-ephemeral-disk.yml \
   --var network_name=default \
   --var web_vm_type=default \
   --var db_vm_type=default \
@@ -17,4 +18,5 @@ bosh deploy -d concourse concourse.yml \
   --var web_network_vm_extension=ilb \
   --var atc_basic_auth.username=admin \
   --var atc_basic_auth.password=admin \
+  --var worker_ephemeral_disk=500GB_ephemeral_disk \
   --var external_url=https://10.100.0.100

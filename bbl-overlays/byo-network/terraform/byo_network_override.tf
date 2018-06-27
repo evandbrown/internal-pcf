@@ -27,12 +27,12 @@ resource "google_compute_subnetwork" "bbl-subnet" {
 }
 
 data "google_compute_network" "bbl-network" {
-  name = "${var.existing-bbl-network}"
+  name    = "${var.existing-bbl-network}"
   project = "${var.existing-host-project}"
 }
 
 data "google_compute_subnetwork" "bbl-subnet" {
-  name = "${var.existing-bbl-subnet}"
+  name    = "${var.existing-bbl-subnet}"
   project = "${var.existing-host-project}"
 }
 
@@ -64,7 +64,7 @@ resource "google_compute_firewall" "internal" {
 resource "google_compute_firewall" "bosh-open" {
   network       = "${data.google_compute_network.bbl-network.name}"
   source_ranges = ["${google_compute_address.jumpbox-ip.address}/32"]
-  project = "${var.existing-host-project}"
+  project       = "${var.existing-host-project}"
 
   allow {
     ports    = ["22", "6868", "8443", "8844", "25555"]

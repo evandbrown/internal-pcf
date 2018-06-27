@@ -1,0 +1,8 @@
+- type: replace
+  path: /networks/name=default/subnets/0/cloud_properties?
+  value:
+    network_name: ((network))
+    subnetwork_name: ((subnetwork))
+    xpn_host_project_id: ((network_host_project))
+    tags: ((tags))
+    ephemeral_external_ip: false

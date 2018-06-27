@@ -1,0 +1,55 @@
+- type: replace
+  path: /networks/name=private?
+  value:
+    name: private
+    type: dynamic
+    subnets:
+    - az: z1
+      cloud_properties:
+        network_name: ((network))
+        subnetwork_name: ((subnetwork))
+        xpn_host_project_id: ((network_host_project))
+        tags:
+          - ((internal_tag_name))
+    - az: z2
+      cloud_properties:
+        network_name: ((network))
+        subnetwork_name: ((subnetwork))
+        xpn_host_project_id: ((network_host_project))
+        tags:
+          - ((internal_tag_name))
+    - az: z3
+      cloud_properties:
+        network_name: ((network))
+        subnetwork_name: ((subnetwork))
+        xpn_host_project_id: ((network_host_project))
+        tags:
+          - ((internal_tag_name))
+
+- type: replace
+  path: /networks/name=default?
+  value:
+    name: default
+    type: dynamic
+    subnets:
+    - az: z1
+      cloud_properties:
+        network_name: ((network))
+        subnetwork_name: ((subnetwork))
+        xpn_host_project_id: ((network_host_project))
+        tags:
+          - ((internal_tag_name))
+    - az: z2
+      cloud_properties:
+        network_name: ((network))
+        subnetwork_name: ((subnetwork))
+        xpn_host_project_id: ((network_host_project))
+        tags:
+          - ((internal_tag_name))
+    - az: z3
+      cloud_properties:
+        network_name: ((network))
+        subnetwork_name: ((subnetwork))
+        xpn_host_project_id: ((network_host_project))
+        tags:
+          - ((internal_tag_name))

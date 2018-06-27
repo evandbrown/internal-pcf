@@ -4,5 +4,4 @@
     cloud_properties:
       tags:
       - ((nat_routing_tag))
-      ephemeral_external_ip: false
     name: nat

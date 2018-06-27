@@ -74,6 +74,10 @@ resource "google_compute_firewall" "bosh-open" {
   target_tags = ["${var.env_id}-bosh-director"]
 }
 
+output "subnet_cidr" {
+  value = "${var.subnet_cidr}"
+}
+
 output "network" {
   value = "${data.google_compute_network.bbl-network.name}"
 }

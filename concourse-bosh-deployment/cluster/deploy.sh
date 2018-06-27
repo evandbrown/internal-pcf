@@ -1,7 +1,5 @@
 bosh deploy -d concourse concourse.yml \
   -l ../versions.yml \
-  -l "/tmp/env-stage-internal-pcf/vars/director-vars-file.yml" \
-  -l "/tmp/env-stage-internal-pcf/vars/director-vars-store.yml" \
   --vars-store cluster-creds.yml \
   -o operations/basic-auth.yml \
   -o operations/privileged-http.yml \
@@ -9,7 +7,6 @@ bosh deploy -d concourse concourse.yml \
   -o operations/tls.yml \
   -o operations/tls-vars.yml \
   -o operations/web-network-extension.yml \
-  -o operations/credhub.yml \
   -o operations/worker-ephemeral-disk.yml \
   --var network_name=default \
   --var web_vm_type=default \
@@ -21,5 +18,5 @@ bosh deploy -d concourse concourse.yml \
   --var web_network_vm_extension=ilb \
   --var atc_basic_auth.username=<CHANGE> \
   --var atc_basic_auth.password=<CHANGE> \
-  --var external_url=https://<CHANGE>
+  --var external_url=https://<<YOUR_ILB_IP_ADDR>> \
   --var worker_ephemeral_disk=500GB_ephemeral_disk

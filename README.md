@@ -26,7 +26,8 @@ This document describes how to use the `internal-pcf` repository to:
     ```
     cd bbl-overlays
     cp .envrc ${BBL_DIR}
-    cp byo-network/create-director-override.sh ${BBL_DIR} 
+    cp byo-network/*.sh ${BBL_DIR}
+    cp byo-network/*.yml ${BBL_DIR}
     for dir in byo-network internal-tcp-lb nat; do
       pushd ${dir}
         rsync -avzh --ignore-errors terraform ${BBL_DIR}
@@ -36,7 +37,9 @@ This document describes how to use the `internal-pcf` repository to:
     done
     ```
 
-1. Go to the directory you created earlier and use `bbl` to provision a BOSH director:
+1. Go to ${BBL_DIR}/vars and edit `byo_network.tfvars` and `internal_tcp_lb.tfvars`
+
+1. Use `bbl` to provision a BOSH director:
 
     ```
     cd ${BBL_DIR}
@@ -52,7 +55,7 @@ This document describes how to use the `internal-pcf` repository to:
       https://bosh.io/d/stemcells/bosh-google-kvm-ubuntu-trusty-go_agent?v=3586.24
     ```
 
-1. Navigate to `concourse-bosh-deployment/cluster` and run `deploy.sh`
+1. In the original cloned repo, navigate to `concourse-bosh-deployment/cluster`, edit <CHANGE> values in `deploy.sh`, then run it.
 
 # Misc
 1. TODO: compilation VMs have public addresses

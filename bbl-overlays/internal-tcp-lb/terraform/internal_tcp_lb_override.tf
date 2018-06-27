@@ -3,7 +3,7 @@ variable "ilb_address" {
 }
 
 resource "google_compute_forwarding_rule" "internal-concourse-web" {
-  name                  = "internal-concourse-web"
+  name                  = "${var.env_id}-internal-concourse-web"
   backend_service       = "${google_compute_region_backend_service.internal_concourse_web.self_link}"
   ports                 = ["80", "443"]
   network               = "${data.google_compute_network.bbl-network.self_link}"
@@ -13,7 +13,7 @@ resource "google_compute_forwarding_rule" "internal-concourse-web" {
 }
 
 resource "google_compute_region_backend_service" "internal_concourse_web" {
-  name        = "internal-concourse-web"
+  name        = "${var.env_id}-internal-concourse-web"
   protocol    = "TCP"
   timeout_sec = 10
 
@@ -25,7 +25,7 @@ resource "google_compute_region_backend_service" "internal_concourse_web" {
 }
 
 resource "google_compute_health_check" "internal_concourse_web" {
-  name               = "internal-concourse-web"
+  name               = "${var.env_id}-internal-concourse-web"
   check_interval_sec = 5
   timeout_sec        = 5
 
@@ -33,14 +33,14 @@ resource "google_compute_health_check" "internal_concourse_web" {
 }
 
 resource "google_compute_instance_group" "internal_concourse_web" {
-  name = "internal-concourse-web"
+  name = "${var.env_id}-internal-concourse-web"
 
   zone    = "${var.zone}"
   network = "${data.google_compute_network.bbl-network.self_link}"
 }
 
 resource "google_compute_firewall" "internal_concourse_web" {
-  name    = "internal-concourse-web"
+  name    = "${var.env_id}-internal-concourse-web"
   network = "${data.google_compute_network.bbl-network.self_link}"
 
   allow {

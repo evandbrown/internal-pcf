@@ -1,5 +1,6 @@
 bosh deploy -d concourse concourse.yml \
   -l ../versions.yml \
+  -l "/tmp/env-stage-internal-pcf/vars/director-vars-file.yml" \
   -l "/tmp/env-stage-internal-pcf/vars/director-vars-store.yml" \
   --vars-store cluster-creds.yml \
   -o operations/basic-auth.yml \

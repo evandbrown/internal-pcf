@@ -6,3 +6,13 @@
     xpn_host_project_id: ((network_host_project))
     tags: ((tags))
     ephemeral_external_ip: false
+
+- type: replace
+  path: /resource_pools/name=vms/cloud_properties?
+  value:
+    zone: ((zone))
+    machine_type: n1-standard-1
+    root_disk_size_gb: 40
+    root_disk_type: pd-standard
+    tags:
+      - ((nat_routing_tag))

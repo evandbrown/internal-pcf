@@ -8,5 +8,5 @@ module "nat" {
 }
 
 output "nat_routing_tag" {
-  value = "${module.nat.routing_tag_zonal}"
+  value = "${module.nat.routing_tag_regional}"
 }

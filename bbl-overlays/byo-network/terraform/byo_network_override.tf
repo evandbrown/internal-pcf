@@ -2,6 +2,10 @@ variable "subnet_cidr" {
   type = "string"
 }
 
+variable "cidr_newbits" {
+  type = "string"
+}
+
 variable "existing-bbl-network" {
   type = "string"
 }

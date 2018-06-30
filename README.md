@@ -3,7 +3,7 @@ This document describes how to use the `internal-pcf` repository to:
 1. Deploy a Pivotal Cloud Foundry installation (via a Concourse pipeline) that prioritizes private networking. A trio of NAT VMs and the Operations Manager VM are the only resources that have public addresses.
 
 # Pre-work
-1. Install the [BOSH Bootloader](https://github.com/cloudfoundry/bosh-bootloader) and its dependencies.
+1. Install the [BOSH Bootloader](https://github.com/cloudfoundry/bosh-bootloader) and its [dependencies](https://github.com/cloudfoundry/bosh-bootloader#install-dependencies).
 1. Install `direnv`
 1. Clone this repository
 
@@ -36,6 +36,8 @@ This document describes how to use the `internal-pcf` repository to:
       popd
     done
     ```
+
+1. Go to ${BBL_DIR/vars and edit `.envrc`
 
 1. Go to ${BBL_DIR}/vars and edit `byo_network.tfvars` and `internal_tcp_lb.tfvars`
 

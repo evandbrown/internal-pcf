@@ -74,7 +74,17 @@ resource "google_compute_firewall" "bosh-open" {
   target_tags = ["${var.env_id}-bosh-director"]
 }
 
+resource "google_compute_address" "director-ip" {
+  name         = "${var.env_id}-director-ip"
+  address_type = "INTERNAL"
+  subnetwork   = "${data.google_compute_subnetwork.bbl-subnet.self_link}"
+}
+
 output "subnet_cidr" {
+  value = "${var.subnet_cidr}"
+}
+
+output "internal_cidr" {
   value = "${var.subnet_cidr}"
 }
 
@@ -88,4 +98,8 @@ output "subnetwork" {
 
 output "network_host_project" {
   value = "${var.existing-host-project}"
+}
+
+output "director__internal_ip" {
+  value = "${google_compute_address.director-ip.address}"
 }

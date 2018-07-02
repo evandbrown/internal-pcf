@@ -28,7 +28,7 @@ This document describes how to use the `internal-pcf` repository to:
     cp .envrc ${BBL_DIR}
     cp byo-network/*.sh ${BBL_DIR}
     cp byo-network/*.yml ${BBL_DIR}
-    for dir in byo-network internal-tcp-lb nat; do
+    for dir in byo-network internal-tcp-lb nat jumpbox_private_ip; do
       pushd ${dir}
         rsync -avzh --ignore-errors terraform ${BBL_DIR}
         rsync -avzh --ignore-errors vars ${BBL_DIR}
@@ -39,7 +39,7 @@ This document describes how to use the `internal-pcf` repository to:
 
 1. Go to ${BBL_DIR/vars and edit `.envrc`
 
-1. Go to ${BBL_DIR}/vars and edit `byo_network.tfvars` and `internal_tcp_lb.tfvars`
+1. Go to ${BBL_DIR}/vars and edit `byo_network.tfvars`
 
 1. Use `bbl` to provision a BOSH director:
 

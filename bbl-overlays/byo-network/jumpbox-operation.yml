@@ -5,3 +5,6 @@
     subnetwork_name: ((subnetwork))
     xpn_host_project_id: ((network_host_project))
     tags: ((tags))
+
+- type: remove
+  path: /instance_groups/name=jumpbox/networks/name=public

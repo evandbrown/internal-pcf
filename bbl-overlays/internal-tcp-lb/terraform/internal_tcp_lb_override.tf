@@ -1,5 +1,7 @@
-variable "ilb_address" {
-  type = "string"
+resource "google_compute_address" "loadbalancer-ip" {
+  name         = "${var.env_id}-loadbalancer-ip"
+  address_type = "INTERNAL"
+  subnetwork   = "${data.google_compute_subnetwork.bbl-subnet.self_link}"
 }
 
 resource "google_compute_forwarding_rule" "internal-concourse-web" {
@@ -9,7 +11,7 @@ resource "google_compute_forwarding_rule" "internal-concourse-web" {
   network               = "${data.google_compute_network.bbl-network.self_link}"
   subnetwork            = "${data.google_compute_subnetwork.bbl-subnet.self_link}"
   load_balancing_scheme = "INTERNAL"
-  ip_address            = "${var.ilb_address}"
+  ip_address            = "${google_compute_address.loadbalancer-ip.address}"
 }
 
 resource "google_compute_region_backend_service" "internal_concourse_web" {
@@ -53,7 +55,7 @@ resource "google_compute_firewall" "internal_concourse_web" {
 }
 
 output "ilb_url" {
-  value = "https://${var.ilb_address}"
+  value = "https://${google_compute_address.loadbalancer-ip.address}"
 }
 
 output "ilb_backend_service" {

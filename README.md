@@ -8,7 +8,8 @@ This document describes how to use the `internal-pcf` repository to:
 
 
 # Pre-work
-1. Install the [BOSH Bootloader](https://github.com/cloudfoundry/bosh-bootloader) and its [dependencies](https://github.com/cloudfoundry/bosh-bootloader#install-dependencies).
+1. If you will be using existing subnetworks that are smaller than `/16`, you will need a patched version of `bbl` until [this PR](https://github.com/cloudfoundry/bosh-bootloader/pull/335) is merged. Download here: [Linux](https://storage.googleapis.com/evandbrown17/bbl-linux)(bf23eb4f95e07392858613809a0796bb1caf97d5) or [Mac](https://storage.googleapis.com/evandbrown17/bbl-linux)(d76f510decf402ea873f014449131590220374ae).
+1. Install `bbl`'s [dependencies](https://github.com/cloudfoundry/bosh-bootloader#install-dependencies).
 1. Install `direnv`
 1. Clone this repository
 
